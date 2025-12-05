@@ -45,8 +45,8 @@
 #define MAX_TABLE 12
 #define ANSWERS_COUNT 4
 
-// Backlight pin
-#define TFT_BACKLIGHT 21
+// Backlight pin - GPIO 27 for CYD (not 21!)
+#define TFT_BACKLIGHT 27
 
 // ============================================================================
 // COLOR PALETTE - Bright, kid-friendly colors!
@@ -244,10 +244,10 @@ void setup() {
     delay(100);
     Serial.println("\n=== Times Table Quiz ===");
 
-    // Initialize backlight FIRST
+    // Initialize backlight on GPIO 27
     pinMode(TFT_BACKLIGHT, OUTPUT);
     digitalWrite(TFT_BACKLIGHT, HIGH);
-    Serial.println("Backlight ON");
+    Serial.println("Backlight ON (GPIO 27)");
 
     // Initialize display
     tft.init();
