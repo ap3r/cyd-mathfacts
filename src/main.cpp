@@ -244,7 +244,7 @@ void setup() {
     delay(100);
     Serial.println("\n=== Times Table Quiz ===");
 
-    // Initialize backlight
+    // Initialize backlight FIRST
     pinMode(TFT_BACKLIGHT, OUTPUT);
     digitalWrite(TFT_BACKLIGHT, HIGH);
     Serial.println("Backlight ON");
@@ -252,6 +252,20 @@ void setup() {
     // Initialize display
     tft.init();
     tft.setRotation(1);  // Landscape mode
+
+    // Print TFT_eSPI driver info for debugging
+    Serial.print("TFT_eSPI ver: ");
+    Serial.println(TFT_ESPI_VERSION);
+    Serial.print("Display driver: ");
+    #if defined(ILI9341_DRIVER) || defined(ILI9341_2_DRIVER)
+    Serial.println("ILI9341");
+    #elif defined(ST7789_DRIVER)
+    Serial.println("ST7789");
+    #else
+    Serial.println("Unknown");
+    #endif
+    Serial.printf("Display size: %d x %d\n", tft.width(), tft.height());
+
     tft.fillScreen(COLOR_BG);
     Serial.println("Display initialized");
 
