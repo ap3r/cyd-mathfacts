@@ -1,33 +1,37 @@
 // User_Setup.h for ESP32-2432S028 (Cheap Yellow Display 2.4")
-// This file configures the TFT_eSPI library for the CYD board
+// Based on working bongo_cat config
 
 #define USER_SETUP_INFO "ESP32-2432S028"
 
 // ##################################################################################
-// Display driver - ILI9341 for CYD v1/v2 (use ST7789_DRIVER for v3)
+// Display driver
 // ##################################################################################
 #define ILI9341_2_DRIVER
 
 // ##################################################################################
 // Display dimensions
 // ##################################################################################
-#define TFT_WIDTH  240
-#define TFT_HEIGHT 320
+#define TFT_WIDTH  320
+#define TFT_HEIGHT 240
 
 // ##################################################################################
-// ESP32 pins used for the display
+// IMPORTANT: Color inversion - required for CYD!
 // ##################################################################################
+#define TFT_INVERSION_ON
+
+// ##################################################################################
+// ESP32 pins - matching bongo_cat working config
+// ##################################################################################
+#define ESP32_DMA
+
 #define TFT_MISO 12
 #define TFT_MOSI 13
 #define TFT_SCLK 14
-#define TFT_CS   15  // Chip select control pin
-#define TFT_DC    2  // Data Command control pin
-#define TFT_RST  -1  // Reset pin (connected to RST on board)
-#define TFT_BL   21  // LED back-light (HIGH to turn on)
+#define TFT_CS   15
+#define TFT_DC   2
+#define TFT_RST  -1
+#define TFT_BL   27  // IMPORTANT: Backlight is GPIO 27, NOT 21!
 
-// ##################################################################################
-// Touch screen chip select (directly configured to work with XPT2046)
-// ##################################################################################
 #define TOUCH_CS 33
 
 // ##################################################################################
@@ -36,36 +40,23 @@
 #define TFT_BACKLIGHT_ON HIGH
 
 // ##################################################################################
-// Fonts to be available
+// Fonts
 // ##################################################################################
-#define LOAD_GLCD   // Font 1. Original Adafruit 8 pixel font needs ~1820 bytes in FLASH
-#define LOAD_FONT2  // Font 2. Small 16 pixel high font, needs ~3534 bytes in FLASH, 96 characters
-#define LOAD_FONT4  // Font 4. Medium 26 pixel high font, needs ~5848 bytes in FLASH, 96 characters
-#define LOAD_FONT6  // Font 6. Large 48 pixel font, needs ~2666 bytes in FLASH, only characters 1234567890:-.apm
-#define LOAD_FONT7  // Font 7. 7 segment 48 pixel font, needs ~2438 bytes in FLASH, only characters 1234567890:-.
-#define LOAD_FONT8  // Font 8. Large 75 pixel font needs ~3256 bytes in FLASH, only characters 1234567890:-.
-#define LOAD_GFXFF  // FreeFonts. Include access to the 48 Adafruit_GFX free fonts FF1 to FF48 and custom fonts
+#define LOAD_GLCD
+#define LOAD_FONT2
+#define LOAD_FONT4
+#define LOAD_FONT6
+#define LOAD_FONT7
+#define LOAD_FONT8
+#define LOAD_GFXFF
 
 #define SMOOTH_FONT
 
 // ##################################################################################
-// SPI configuration
+// SPI configuration - use VSPI (default), NOT HSPI
 // ##################################################################################
-#define SPI_FREQUENCY       40000000  // 40 MHz - stable for CYD
-#define SPI_READ_FREQUENCY  16000000  // 16 MHz for reading
-#define SPI_TOUCH_FREQUENCY  2500000  // 2.5 MHz for touch
+#define SPI_FREQUENCY       65000000
+#define SPI_READ_FREQUENCY  80000000
+#define SPI_TOUCH_FREQUENCY  2500000
 
-// Use HSPI port for ESP32 (the CYD uses HSPI for display)
-#define USE_HSPI_PORT
-
-// ##################################################################################
-// Optional: Color inversion (uncomment if colors look wrong)
-// ##################################################################################
-// #define TFT_INVERSION_ON
-// #define TFT_INVERSION_OFF
-
-// ##################################################################################
-// Optional: Color order (uncomment if red/blue swapped)
-// ##################################################################################
-// #define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
-// #define TFT_RGB_ORDER TFT_BGR  // Colour order Blue-Green-Red
+// NOTE: Do NOT define USE_HSPI_PORT - CYD works with default VSPI
