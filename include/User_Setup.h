@@ -55,5 +55,17 @@
 #define SPI_READ_FREQUENCY  16000000  // 16 MHz for reading
 #define SPI_TOUCH_FREQUENCY  2500000  // 2.5 MHz for touch
 
-// Use hardware SPI
+// Use HSPI port for ESP32 (the CYD uses HSPI for display)
 #define USE_HSPI_PORT
+
+// ##################################################################################
+// Optional: Color inversion (uncomment if colors look wrong)
+// ##################################################################################
+// #define TFT_INVERSION_ON
+// #define TFT_INVERSION_OFF
+
+// ##################################################################################
+// Optional: Color order (uncomment if red/blue swapped)
+// ##################################################################################
+// #define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
+// #define TFT_RGB_ORDER TFT_BGR  // Colour order Blue-Green-Red
