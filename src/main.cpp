@@ -244,10 +244,14 @@ void setup() {
     delay(100);
     Serial.println("\n=== Times Table Quiz ===");
 
-    // Initialize backlight FIRST
+    // Initialize backlight FIRST - try both HIGH and LOW
     pinMode(TFT_BACKLIGHT, OUTPUT);
-    digitalWrite(TFT_BACKLIGHT, HIGH);
-    Serial.println("Backlight ON");
+    digitalWrite(TFT_BACKLIGHT, HIGH);  // Most CYDs use HIGH
+    Serial.println("Backlight ON (HIGH)");
+
+    // Some CYDs have inverted backlight - uncomment if screen stays black:
+    // digitalWrite(TFT_BACKLIGHT, LOW);
+    // Serial.println("Backlight ON (LOW - inverted)");
 
     // Initialize display
     tft.init();
