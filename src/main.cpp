@@ -23,9 +23,16 @@
 // CONFIGURATION
 // ============================================================================
 
-// Touch calibration for CYD 2.4"
-#define TOUCH_MIN_X 300
-#define TOUCH_MAX_X 3800
+// CYD 2.4" Touch pins (directly defined, not from build flags)
+#define XPT2046_IRQ 36
+#define XPT2046_MOSI 32
+#define XPT2046_MISO 39
+#define XPT2046_CLK 25
+#define XPT2046_CS 33
+
+// Touch calibration for CYD 2.4" (landscape mode)
+#define TOUCH_MIN_X 200
+#define TOUCH_MAX_X 3700
 #define TOUCH_MIN_Y 300
 #define TOUCH_MAX_Y 3800
 
@@ -80,8 +87,8 @@
 // ============================================================================
 
 TFT_eSPI tft = TFT_eSPI();
-SPIClass touchSPI(VSPI);
-XPT2046_Touchscreen touch(TOUCH_CS, TOUCH_IRQ);
+SPIClass touchSPI = SPIClass(VSPI);
+XPT2046_Touchscreen touch(XPT2046_CS, XPT2046_IRQ);
 Preferences prefs;
 
 // ============================================================================
@@ -234,21 +241,33 @@ uint16_t dimColor(uint16_t color, float factor);
 
 void setup() {
     Serial.begin(115200);
+    delay(100);
     Serial.println("\n=== Times Table Quiz ===");
 
     // Initialize backlight
     pinMode(TFT_BACKLIGHT, OUTPUT);
     digitalWrite(TFT_BACKLIGHT, HIGH);
+    Serial.println("Backlight ON");
 
     // Initialize display
     tft.init();
     tft.setRotation(1);  // Landscape mode
     tft.fillScreen(COLOR_BG);
+    Serial.println("Display initialized");
 
-    // Initialize touch
-    touchSPI.begin(25, 39, 32, TOUCH_CS);  // CYD touch SPI pins
+    // Quick test - draw something visible
+    tft.fillScreen(TFT_BLUE);
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(2);
+    tft.setCursor(50, 100);
+    tft.println("Initializing...");
+    delay(500);
+
+    // Initialize touch on VSPI with correct pins
+    touchSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
     touch.begin(touchSPI);
     touch.setRotation(1);
+    Serial.println("Touch initialized");
 
     // Initialize random seed
     randomSeed(analogRead(34) + millis());
@@ -262,6 +281,7 @@ void setup() {
 
     // Show splash screen
     currentScreen = SCREEN_SPLASH;
+    tft.fillScreen(COLOR_BG);
     drawSplashScreen();
 
     Serial.println("Setup complete!");
@@ -337,20 +357,37 @@ void loop() {
 // ============================================================================
 
 bool getTouchPoint(int &x, int &y) {
-    if (touch.tirqTouched() && touch.touched()) {
-        TS_Point p = touch.getPoint();
-
-        // Map touch coordinates to screen
-        x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_WIDTH);
-        y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_HEIGHT);
-
-        // Clamp to screen bounds
-        x = constrain(x, 0, SCREEN_WIDTH - 1);
-        y = constrain(y, 0, SCREEN_HEIGHT - 1);
-
-        return true;
+    // Check if IRQ indicates touch
+    if (!touch.tirqTouched()) {
+        return false;
     }
-    return false;
+
+    // Verify actually touched
+    if (!touch.touched()) {
+        return false;
+    }
+
+    TS_Point p = touch.getPoint();
+
+    // Filter out invalid readings (z pressure too low or coords at 0)
+    if (p.z < 400 || (p.x == 0 && p.y == 0)) {
+        return false;
+    }
+
+    // Filter out out-of-range values
+    if (p.x < 100 || p.x > 4000 || p.y < 100 || p.y > 4000) {
+        return false;
+    }
+
+    // Map touch coordinates to screen (landscape)
+    x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_WIDTH);
+    y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_HEIGHT);
+
+    // Clamp to screen bounds
+    x = constrain(x, 0, SCREEN_WIDTH - 1);
+    y = constrain(y, 0, SCREEN_HEIGHT - 1);
+
+    return true;
 }
 
 void handleTouch(int x, int y) {
