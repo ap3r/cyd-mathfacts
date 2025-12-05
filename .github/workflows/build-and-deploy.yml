@@ -59,25 +59,7 @@ jobs:
           echo "Warning: boot_app0.bin not found, creating empty placeholder" && touch docs/firmware/boot_app0.bin
 
       - name: Generate manifest.json
-        run: |
-          cat > docs/manifest.json << 'EOF'
-          {
-            "name": "Math Facts! - Times Table Quiz",
-            "version": "1.0.0",
-            "new_install_prompt_erase": true,
-            "builds": [
-              {
-                "chipFamily": "ESP32",
-                "parts": [
-                  { "path": "firmware/bootloader.bin", "offset": 4096 },
-                  { "path": "firmware/partitions.bin", "offset": 32768 },
-                  { "path": "firmware/boot_app0.bin", "offset": 57344 },
-                  { "path": "firmware/firmware.bin", "offset": 65536 }
-                ]
-              }
-            ]
-          }
-          EOF
+        run: echo '{"name":"Math Facts! - Times Table Quiz","version":"1.0.0","new_install_prompt_erase":true,"builds":[{"chipFamily":"ESP32","parts":[{"path":"firmware/bootloader.bin","offset":4096},{"path":"firmware/partitions.bin","offset":32768},{"path":"firmware/boot_app0.bin","offset":57344},{"path":"firmware/firmware.bin","offset":65536}]}]}' > docs/manifest.json
 
       - name: Upload artifact for Pages
         uses: actions/upload-pages-artifact@v3
