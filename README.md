@@ -15,7 +15,7 @@ A fun, colorful multiplication quiz game for the ESP32 "Cheap Yellow Display" (C
 
 Visit the web flasher page and flash directly from your browser:
 
-**[Flash Math Facts! to Your CYD](https://your-username.github.io/cyd-mathfacts/)**
+**[Flash Math Facts! to Your CYD](https://ap3r.github.io/cyd-mathfacts/)**
 
 Requirements:
 - ESP32-2432S028 (2.4" Cheap Yellow Display)
