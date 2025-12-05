@@ -218,6 +218,7 @@ void updateStars();
 void drawStars();
 
 bool getTouchPoint(int &x, int &y);
+void handleTouch(int x, int y);
 void drawButton(int x, int y, int w, int h, uint16_t color, const char* text, int textSize);
 void drawRoundedRect(int x, int y, int w, int h, int r, uint16_t color);
 void fillRoundedRect(int x, int y, int w, int h, int r, uint16_t color);
