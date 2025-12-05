@@ -371,29 +371,30 @@ void loop() {
 // ============================================================================
 
 bool getTouchPoint(int &x, int &y) {
-    // Check if IRQ indicates touch
-    if (!touch.tirqTouched()) {
-        return false;
+    // Debug: Check raw touch state periodically
+    static unsigned long lastDebug = 0;
+    if (millis() - lastDebug > 1000) {
+        lastDebug = millis();
+        if (touch.touched()) {
+            TS_Point p = touch.getPoint();
+            Serial.printf("Raw touch: x=%d y=%d z=%d\n", p.x, p.y, p.z);
+        }
     }
 
-    // Verify actually touched
+    // Check if touched
     if (!touch.touched()) {
         return false;
     }
 
     TS_Point p = touch.getPoint();
 
-    // Filter out invalid readings (z pressure too low or coords at 0)
-    if (p.z < 400 || (p.x == 0 && p.y == 0)) {
-        return false;
-    }
-
-    // Filter out out-of-range values
-    if (p.x < 100 || p.x > 4000 || p.y < 100 || p.y > 4000) {
+    // Filter out invalid readings
+    if (p.z < 100) {  // Lower threshold
         return false;
     }
 
     // Map touch coordinates to screen (landscape)
+    // Note: May need to swap/invert axes depending on rotation
     x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_WIDTH);
     y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_HEIGHT);
 
