@@ -269,11 +269,38 @@ void setup() {
     tft.println("Initializing...");
     delay(500);
 
-    // Load or run touch calibration
+    // Load touch calibration
     loadTouchCalibration();
 
-    if (!touchCalibrated) {
+    // Show option to recalibrate
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(2);
+    tft.setCursor(30, 60);
+    tft.println("Touch screen NOW");
+    tft.setCursor(30, 90);
+    tft.println("to recalibrate");
+    tft.setCursor(30, 140);
+    tft.setTextSize(1);
+    tft.println("(or wait 3 seconds to skip)");
+
+    // Wait 3 seconds, check for touch to recalibrate
+    uint16_t tx, ty;
+    bool doRecalibrate = false;
+    unsigned long waitStart = millis();
+
+    while (millis() - waitStart < 3000) {
+        if (tft.getTouch(&tx, &ty, 300)) {
+            doRecalibrate = true;
+            break;
+        }
+        delay(50);
+    }
+
+    if (doRecalibrate || !touchCalibrated) {
         Serial.println("Running touch calibration...");
+        // Clear old calibration
+        touchCalibrated = false;
         runTouchCalibration();
     } else {
         tft.setTouch(touchCalData);
@@ -371,9 +398,13 @@ bool getTouchPoint(int &x, int &y) {
     uint16_t touchX, touchY;
 
     // Use TFT_eSPI's built-in touch - returns true if touched
-    if (tft.getTouch(&touchX, &touchY, 300)) {  // Lower threshold for better response
+    if (tft.getTouch(&touchX, &touchY, 300)) {
         x = touchX;
         y = touchY;
+
+        // Debug: show touch coordinates
+        Serial.printf("Touch raw: x=%d y=%d\n", x, y);
+
         return true;
     }
 
