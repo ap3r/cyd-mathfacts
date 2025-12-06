@@ -23,8 +23,9 @@
 // ============================================================================
 
 // Touch calibration values for TFT_eSPI (landscape mode)
-// These may need adjustment - run calibration if touch is inaccurate
+// These will be loaded from preferences or calibrated on first run
 uint16_t touchCalData[5] = {275, 3620, 264, 3532, 1};
+bool touchCalibrated = false;
 
 // Display dimensions
 #define SCREEN_WIDTH 320
@@ -214,6 +215,9 @@ void drawStars();
 
 bool getTouchPoint(int &x, int &y);
 void handleTouch(int x, int y);
+void loadTouchCalibration();
+void saveTouchCalibration();
+void runTouchCalibration();
 void drawButton(int x, int y, int w, int h, uint16_t color, const char* text, int textSize);
 void drawRoundedRect(int x, int y, int w, int h, int r, uint16_t color);
 void fillRoundedRect(int x, int y, int w, int h, int r, uint16_t color);
@@ -265,9 +269,16 @@ void setup() {
     tft.println("Initializing...");
     delay(500);
 
-    // Initialize touch using TFT_eSPI's built-in touch support
-    tft.setTouch(touchCalData);
-    Serial.println("Touch initialized (TFT_eSPI)");
+    // Load or run touch calibration
+    loadTouchCalibration();
+
+    if (!touchCalibrated) {
+        Serial.println("Running touch calibration...");
+        runTouchCalibration();
+    } else {
+        tft.setTouch(touchCalData);
+        Serial.println("Touch calibration loaded from memory");
+    }
 
     // Initialize random seed
     randomSeed(analogRead(34) + millis());
@@ -360,17 +371,71 @@ bool getTouchPoint(int &x, int &y) {
     uint16_t touchX, touchY;
 
     // Use TFT_eSPI's built-in touch - returns true if touched
-    if (tft.getTouch(&touchX, &touchY, 600)) {
+    if (tft.getTouch(&touchX, &touchY, 300)) {  // Lower threshold for better response
         x = touchX;
         y = touchY;
-
-        // Debug output
-        Serial.printf("Touch: x=%d y=%d\n", x, y);
-
         return true;
     }
 
     return false;
+}
+
+void loadTouchCalibration() {
+    prefs.begin("mathquiz", true);
+    touchCalibrated = prefs.getBool("touchCal", false);
+    if (touchCalibrated) {
+        touchCalData[0] = prefs.getUShort("cal0", 275);
+        touchCalData[1] = prefs.getUShort("cal1", 3620);
+        touchCalData[2] = prefs.getUShort("cal2", 264);
+        touchCalData[3] = prefs.getUShort("cal3", 3532);
+        touchCalData[4] = prefs.getUShort("cal4", 1);
+        Serial.printf("Loaded cal: %d %d %d %d %d\n",
+            touchCalData[0], touchCalData[1], touchCalData[2], touchCalData[3], touchCalData[4]);
+    }
+    prefs.end();
+}
+
+void saveTouchCalibration() {
+    prefs.begin("mathquiz", false);
+    prefs.putBool("touchCal", true);
+    prefs.putUShort("cal0", touchCalData[0]);
+    prefs.putUShort("cal1", touchCalData[1]);
+    prefs.putUShort("cal2", touchCalData[2]);
+    prefs.putUShort("cal3", touchCalData[3]);
+    prefs.putUShort("cal4", touchCalData[4]);
+    prefs.end();
+    touchCalibrated = true;
+    Serial.printf("Saved cal: %d %d %d %d %d\n",
+        touchCalData[0], touchCalData[1], touchCalData[2], touchCalData[3], touchCalData[4]);
+}
+
+void runTouchCalibration() {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(2);
+
+    tft.setCursor(20, 50);
+    tft.println("TOUCH CALIBRATION");
+    tft.setCursor(20, 80);
+    tft.println("Touch the arrows");
+    tft.setCursor(20, 110);
+    tft.println("in each corner");
+
+    delay(2000);
+
+    // Run TFT_eSPI calibration - user touches 4 corners
+    tft.calibrateTouch(touchCalData, TFT_MAGENTA, TFT_BLACK, 15);
+
+    // Save calibration
+    saveTouchCalibration();
+
+    // Apply calibration
+    tft.setTouch(touchCalData);
+
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(40, 100);
+    tft.println("Calibration saved!");
+    delay(1500);
 }
 
 void handleTouch(int x, int y) {
