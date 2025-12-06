@@ -23,10 +23,9 @@
 // ============================================================================
 
 // Touch calibration values for TFT_eSPI (landscape mode)
-// Known-good values for CYD ESP32-2432S028
 // Format: {minX, maxX, minY, maxY, rotation}
-// Trying rotation 7 (swap X/Y + invert both X and Y)
-uint16_t touchCalData[5] = {300, 3600, 300, 3600, 7};
+// Using rotation 0 - manual transformation in getTouchPoint()
+uint16_t touchCalData[5] = {300, 3600, 300, 3600, 0};
 bool touchCalibrated = false;
 
 // Display dimensions
@@ -368,11 +367,27 @@ bool getTouchPoint(int &x, int &y) {
 
     // Use TFT_eSPI's built-in touch - returns true if touched
     if (tft.getTouch(&touchX, &touchY, 300)) {
-        x = touchX;
-        y = touchY;
+        // Manual coordinate transformation for CYD ESP32-2432S028
+        // Observed touch ranges:
+        //   touchX (33-126) maps to vertical position (bottom to top)
+        //   touchY (67-177) maps to horizontal position (right to left)
+        // We need to swap and invert to get proper screen coordinates
 
-        // Debug: show touch coordinates
-        Serial.printf("Touch raw: x=%d y=%d\n", x, y);
+        // Swap X and Y, then invert both to match screen orientation
+        // Use wider ranges to cover full screen (extrapolated from button area)
+        int rawX = touchX;
+        int rawY = touchY;
+
+        // Map touchY (right-to-left: ~50-190) to display X (left-to-right: 0-320)
+        x = map(rawY, 190, 50, 0, 320);
+        x = constrain(x, 0, 320);
+
+        // Map touchX (bottom-to-top: ~20-140) to display Y (top-to-bottom: 0-240)
+        y = map(rawX, 140, 20, 0, 240);
+        y = constrain(y, 0, 240);
+
+        // Debug: show both raw and mapped coordinates
+        Serial.printf("Touch raw: tx=%d ty=%d -> mapped: x=%d y=%d\n", rawX, rawY, x, y);
 
         return true;
     }
