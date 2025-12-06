@@ -53,10 +53,12 @@
 #define SMOOTH_FONT
 
 // ##################################################################################
-// SPI configuration - use VSPI (default), NOT HSPI
+// SPI configuration
 // ##################################################################################
 #define SPI_FREQUENCY       65000000
 #define SPI_READ_FREQUENCY  80000000
 #define SPI_TOUCH_FREQUENCY  2500000
 
-// NOTE: Do NOT define USE_HSPI_PORT - CYD works with default VSPI
+// IMPORTANT: Use HSPI for display (pins 12,13,14 are HSPI)
+// This frees up VSPI for the touch controller
+#define USE_HSPI_PORT
