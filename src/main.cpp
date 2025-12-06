@@ -368,22 +368,20 @@ bool getTouchPoint(int &x, int &y) {
     // Use TFT_eSPI's built-in touch - returns true if touched
     if (tft.getTouch(&touchX, &touchY, 300)) {
         // Manual coordinate transformation for CYD ESP32-2432S028
-        // Observed touch ranges:
-        //   touchX (33-126) maps to vertical position (bottom to top)
-        //   touchY (67-177) maps to horizontal position (right to left)
-        // We need to swap and invert to get proper screen coordinates
+        // Observed touch ranges from screen corners:
+        //   tx: 8 (left) to 285 (right)
+        //   ty: 16 (top) to 229 (bottom)
+        // Direct mapping, no swap or inversion needed
 
-        // Swap X and Y, then invert both to match screen orientation
-        // Use wider ranges to cover full screen (extrapolated from button area)
         int rawX = touchX;
         int rawY = touchY;
 
-        // Map touchY (right-to-left: ~50-190) to display X (left-to-right: 0-320)
-        x = map(rawY, 190, 50, 0, 320);
+        // Map tx (left-to-right: 0-290) to display X (0-320)
+        x = map(rawX, 0, 290, 0, 320);
         x = constrain(x, 0, 320);
 
-        // Map touchX (bottom-to-top: ~20-140) to display Y (top-to-bottom: 0-240)
-        y = map(rawX, 140, 20, 0, 240);
+        // Map ty (top-to-bottom: 10-235) to display Y (0-240)
+        y = map(rawY, 10, 235, 0, 240);
         y = constrain(y, 0, 240);
 
         // Debug: show both raw and mapped coordinates
