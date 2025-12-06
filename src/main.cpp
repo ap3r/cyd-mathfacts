@@ -551,14 +551,19 @@ void handleTouch(int x, int y) {
                 int gapX = 10;
                 int gapY = 10;
 
+                Serial.printf("Checking buttons at touch (%d,%d)\n", x, y);
+
                 for (int i = 0; i < 4; i++) {
                     int col = i % 2;
                     int row = i / 2;
                     int btnX = startX + col * (btnWidth + gapX);
                     int btnY = startY + row * (btnHeight + gapY);
 
+                    Serial.printf("  Btn %d: x=%d-%d, y=%d-%d\n", i, btnX, btnX+btnWidth, btnY, btnY+btnHeight);
+
                     if (x >= btnX && x <= btnX + btnWidth &&
                         y >= btnY && y <= btnY + btnHeight) {
+                        Serial.printf("  -> MATCH! Selecting answer %d\n", i);
                         checkAnswer(i);
                         break;
                     }
