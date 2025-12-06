@@ -32,7 +32,13 @@
 #define TFT_RST  -1
 #define TFT_BL   27  // IMPORTANT: Backlight is GPIO 27, NOT 21!
 
-#define TOUCH_CS 33
+// ##################################################################################
+// Touch pins - XPT2046 on separate SPI bus
+// ##################################################################################
+#define TOUCH_CS   33
+#define TOUCH_MISO 39
+#define TOUCH_MOSI 32
+#define TOUCH_CLK  25
 
 // ##################################################################################
 // Backlight control
