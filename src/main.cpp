@@ -23,8 +23,8 @@
 // ============================================================================
 
 // Touch calibration values for TFT_eSPI (landscape mode)
-// These will be loaded from preferences or calibrated on first run
-uint16_t touchCalData[5] = {275, 3620, 264, 3532, 1};
+// Known-good values for CYD ESP32-2432S028
+uint16_t touchCalData[5] = {391, 3491, 266, 3610, 7};
 bool touchCalibrated = false;
 
 // Display dimensions
@@ -269,43 +269,10 @@ void setup() {
     tft.println("Initializing...");
     delay(500);
 
-    // Load touch calibration
-    loadTouchCalibration();
-
-    // Show option to recalibrate
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE);
-    tft.setTextSize(2);
-    tft.setCursor(30, 60);
-    tft.println("Touch screen NOW");
-    tft.setCursor(30, 90);
-    tft.println("to recalibrate");
-    tft.setCursor(30, 140);
-    tft.setTextSize(1);
-    tft.println("(or wait 3 seconds to skip)");
-
-    // Wait 3 seconds, check for touch to recalibrate
-    uint16_t tx, ty;
-    bool doRecalibrate = false;
-    unsigned long waitStart = millis();
-
-    while (millis() - waitStart < 3000) {
-        if (tft.getTouch(&tx, &ty, 300)) {
-            doRecalibrate = true;
-            break;
-        }
-        delay(50);
-    }
-
-    if (doRecalibrate || !touchCalibrated) {
-        Serial.println("Running touch calibration...");
-        // Clear old calibration
-        touchCalibrated = false;
-        runTouchCalibration();
-    } else {
-        tft.setTouch(touchCalData);
-        Serial.println("Touch calibration loaded from memory");
-    }
+    // Use hardcoded touch calibration (known-good for CYD)
+    tft.setTouch(touchCalData);
+    Serial.printf("Touch calibration set: %d %d %d %d %d\n",
+        touchCalData[0], touchCalData[1], touchCalData[2], touchCalData[3], touchCalData[4]);
 
     // Initialize random seed
     randomSeed(analogRead(34) + millis());
