@@ -15,7 +15,6 @@
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
-#include <XPT2046_Touchscreen.h>
 #include <SPI.h>
 #include <Preferences.h>
 
@@ -23,18 +22,9 @@
 // CONFIGURATION
 // ============================================================================
 
-// CYD 2.4" Touch pins (directly defined, not from build flags)
-#define XPT2046_IRQ 36
-#define XPT2046_MOSI 32
-#define XPT2046_MISO 39
-#define XPT2046_CLK 25
-#define XPT2046_CS 33
-
-// Touch calibration for CYD 2.4" (landscape mode)
-#define TOUCH_MIN_X 200
-#define TOUCH_MAX_X 3700
-#define TOUCH_MIN_Y 300
-#define TOUCH_MAX_Y 3800
+// Touch calibration values for TFT_eSPI (landscape mode)
+// These may need adjustment - run calibration if touch is inaccurate
+uint16_t touchCalData[5] = {275, 3620, 264, 3532, 1};
 
 // Display dimensions
 #define SCREEN_WIDTH 320
@@ -87,8 +77,6 @@
 // ============================================================================
 
 TFT_eSPI tft = TFT_eSPI();
-SPIClass touchSPI = SPIClass(VSPI);
-XPT2046_Touchscreen touch(XPT2046_CS, XPT2046_IRQ);
 Preferences prefs;
 
 // ============================================================================
@@ -277,11 +265,9 @@ void setup() {
     tft.println("Initializing...");
     delay(500);
 
-    // Initialize touch on VSPI with correct pins
-    touchSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
-    touch.begin(touchSPI);
-    touch.setRotation(1);
-    Serial.println("Touch initialized");
+    // Initialize touch using TFT_eSPI's built-in touch support
+    tft.setTouch(touchCalData);
+    Serial.println("Touch initialized (TFT_eSPI)");
 
     // Initialize random seed
     randomSeed(analogRead(34) + millis());
@@ -371,38 +357,20 @@ void loop() {
 // ============================================================================
 
 bool getTouchPoint(int &x, int &y) {
-    // Debug: Check raw touch state periodically
-    static unsigned long lastDebug = 0;
-    if (millis() - lastDebug > 1000) {
-        lastDebug = millis();
-        if (touch.touched()) {
-            TS_Point p = touch.getPoint();
-            Serial.printf("Raw touch: x=%d y=%d z=%d\n", p.x, p.y, p.z);
-        }
+    uint16_t touchX, touchY;
+
+    // Use TFT_eSPI's built-in touch - returns true if touched
+    if (tft.getTouch(&touchX, &touchY, 600)) {
+        x = touchX;
+        y = touchY;
+
+        // Debug output
+        Serial.printf("Touch: x=%d y=%d\n", x, y);
+
+        return true;
     }
 
-    // Check if touched
-    if (!touch.touched()) {
-        return false;
-    }
-
-    TS_Point p = touch.getPoint();
-
-    // Filter out invalid readings
-    if (p.z < 100) {  // Lower threshold
-        return false;
-    }
-
-    // Map touch coordinates to screen (landscape)
-    // Note: May need to swap/invert axes depending on rotation
-    x = map(p.x, TOUCH_MIN_X, TOUCH_MAX_X, 0, SCREEN_WIDTH);
-    y = map(p.y, TOUCH_MIN_Y, TOUCH_MAX_Y, 0, SCREEN_HEIGHT);
-
-    // Clamp to screen bounds
-    x = constrain(x, 0, SCREEN_WIDTH - 1);
-    y = constrain(y, 0, SCREEN_HEIGHT - 1);
-
-    return true;
+    return false;
 }
 
 void handleTouch(int x, int y) {
