@@ -417,11 +417,88 @@ void runTouchCalibration() {
     tft.setCursor(20, 50);
     tft.println("TOUCH CALIBRATION");
     tft.setCursor(20, 80);
-    tft.println("Touch the arrows");
+    tft.println("Touch the screen");
     tft.setCursor(20, 110);
-    tft.println("in each corner");
+    tft.println("to begin...");
 
-    delay(2000);
+    // Wait for a real touch (not phantom touch)
+    // If we're getting constant touches, that's a bad sign
+    int phantomCount = 0;
+    int noTouchCount = 0;
+    uint16_t tx, ty;
+
+    Serial.println("Waiting for touch to stabilize...");
+
+    for (int i = 0; i < 100; i++) {
+        if (tft.getTouch(&tx, &ty, 300)) {
+            phantomCount++;
+        } else {
+            noTouchCount++;
+        }
+        delay(20);
+    }
+
+    Serial.printf("Touch check: %d phantom, %d no-touch\n", phantomCount, noTouchCount);
+
+    // If we got constant phantom touches, touch is broken - use defaults
+    if (phantomCount > 80) {
+        Serial.println("ERROR: Touch appears broken (constant phantom touches)");
+        Serial.println("Using default calibration values");
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(20, 80);
+        tft.println("Touch error!");
+        tft.setCursor(20, 110);
+        tft.println("Using defaults...");
+        delay(2000);
+
+        // Use hardcoded defaults for CYD
+        touchCalData[0] = 300;
+        touchCalData[1] = 3600;
+        touchCalData[2] = 300;
+        touchCalData[3] = 3600;
+        touchCalData[4] = 1;
+        saveTouchCalibration();
+        tft.setTouch(touchCalData);
+        return;
+    }
+
+    // Now wait for user to actually touch
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(20, 80);
+    tft.println("Touch screen NOW");
+    tft.setCursor(20, 110);
+    tft.println("to calibrate...");
+
+    // Wait for touch
+    unsigned long startWait = millis();
+    while (!tft.getTouch(&tx, &ty, 300)) {
+        if (millis() - startWait > 10000) {
+            // Timeout - use defaults
+            Serial.println("Calibration timeout, using defaults");
+            touchCalData[0] = 300;
+            touchCalData[1] = 3600;
+            touchCalData[2] = 300;
+            touchCalData[3] = 3600;
+            touchCalData[4] = 1;
+            saveTouchCalibration();
+            tft.setTouch(touchCalData);
+            return;
+        }
+        delay(10);
+    }
+
+    // Wait for release
+    while (tft.getTouch(&tx, &ty, 300)) {
+        delay(10);
+    }
+    delay(500);
+
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(20, 50);
+    tft.println("Touch the arrows");
+    tft.setCursor(20, 80);
+    tft.println("in each corner");
+    delay(1500);
 
     // Run TFT_eSPI calibration - user touches 4 corners
     tft.calibrateTouch(touchCalData, TFT_MAGENTA, TFT_BLACK, 15);
