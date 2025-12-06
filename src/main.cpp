@@ -24,7 +24,9 @@
 
 // Touch calibration values for TFT_eSPI (landscape mode)
 // Known-good values for CYD ESP32-2432S028
-uint16_t touchCalData[5] = {391, 3491, 266, 3610, 7};
+// Format: {minX, maxX, minY, maxY, rotation}
+// Trying rotation 1 (invert Y only)
+uint16_t touchCalData[5] = {300, 3600, 300, 3600, 1};
 bool touchCalibrated = false;
 
 // Display dimensions
