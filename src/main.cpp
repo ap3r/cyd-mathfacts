@@ -119,6 +119,7 @@ struct Achievement {
     const char* icon;
     const char* description;
     bool unlocked;
+    bool shown;  // Track if popup has been displayed
 };
 
 // Global state
@@ -129,6 +130,7 @@ unsigned long questionStartTime = 0;
 unsigned long lastTouchTime = 0;
 int selectedAnswer = -1;
 bool showingFeedback = false;
+bool lastAnswerCorrect = false;  // Track for redrawing feedback over confetti
 unsigned long feedbackStartTime = 0;
 
 // Confetti particles
@@ -159,18 +161,18 @@ Star stars[MAX_STARS];
 // Achievement definitions
 #define NUM_ACHIEVEMENTS 12
 Achievement achievements[NUM_ACHIEVEMENTS] = {
-    {"First Steps", "1", "Answer your first question!", false},
-    {"Getting Started", "5", "Get 5 correct answers!", false},
-    {"Math Whiz", "10", "Get 10 correct answers!", false},
-    {"On Fire!", "F", "Get a 5 streak!", false},
-    {"Unstoppable", "U", "Get a 10 streak!", false},
-    {"Lightning", "L", "Answer in under 2 seconds!", false},
-    {"Perfect Round", "P", "Get 10/10 in a round!", false},
-    {"Table Master", "T", "Complete a full times table!", false},
-    {"Half Way", "H", "Complete 6 times tables!", false},
-    {"Math Champion", "C", "Complete all 12 times tables!", false},
-    {"Century", "100", "Get 100 correct answers!", false},
-    {"Dedication", "D", "Get 50 correct in a row!", false}
+    {"First Steps", "1", "Answer your first question!", false, false},
+    {"Getting Started", "5", "Get 5 correct answers!", false, false},
+    {"Math Whiz", "10", "Get 10 correct answers!", false, false},
+    {"On Fire!", "F", "Get a 5 streak!", false, false},
+    {"Unstoppable", "U", "Get a 10 streak!", false, false},
+    {"Lightning", "L", "Answer in under 2 seconds!", false, false},
+    {"Perfect Round", "P", "Get 10/10 in a round!", false, false},
+    {"Table Master", "T", "Complete a full times table!", false, false},
+    {"Half Way", "H", "Complete 6 times tables!", false, false},
+    {"Math Champion", "C", "Complete all 12 times tables!", false, false},
+    {"Century", "100", "Get 100 correct answers!", false, false},
+    {"Dedication", "D", "Get 50 correct in a row!", false, false}
 };
 
 // Rainbow colors array for effects
@@ -309,12 +311,22 @@ void loop() {
             updateConfetti();
             drawConfetti();
 
-            // Stop confetti after 3 seconds
-            if (now - confettiStartTime > 3000) {
+            // Redraw feedback text that confetti may have erased
+            if (showingFeedback) {
+                drawResultScreen(lastAnswerCorrect);
+            }
+
+            // Stop confetti after 2 seconds
+            if (now - confettiStartTime > 2000) {
                 confettiActive = false;
-                // Redraw current screen
+                // Redraw current screen to clean up
                 if (currentScreen == SCREEN_QUIZ) {
-                    drawQuizScreen();
+                    if (showingFeedback) {
+                        drawQuizScreen();
+                        drawResultScreen(lastAnswerCorrect);
+                    } else {
+                        drawQuizScreen();
+                    }
                 }
             }
         }
@@ -329,12 +341,11 @@ void loop() {
     if (showingFeedback && now - feedbackStartTime > 1500) {
         showingFeedback = false;
 
-        // Check if we should show achievement
-        static int pendingAchievement = -1;
+        // Check if we should show a newly unlocked achievement
         for (int i = 0; i < NUM_ACHIEVEMENTS; i++) {
-            if (achievements[i].unlocked && pendingAchievement != i) {
-                // Check if this was just unlocked
-                pendingAchievement = i;
+            if (achievements[i].unlocked && !achievements[i].shown) {
+                // This achievement was just unlocked - show it!
+                achievements[i].shown = true;
                 currentScreen = SCREEN_ACHIEVEMENT;
                 drawAchievementPopup(i);
                 initStars();
@@ -691,6 +702,7 @@ void checkAnswer(int answerIndex) {
     bool correct = (answerIndex == currentQuestion.correctIndex);
 
     showingFeedback = true;
+    lastAnswerCorrect = correct;  // Store for redrawing over confetti
     feedbackStartTime = millis();
 
     if (correct) {
@@ -814,14 +826,19 @@ void saveStats() {
     prefs.putULong("fastest", stats.fastestAnswer);
     prefs.putInt("tables", stats.tablesCompleted);
 
-    // Save achievements
+    // Save achievements (unlocked and shown status)
     uint32_t achievementBits = 0;
+    uint32_t shownBits = 0;
     for (int i = 0; i < NUM_ACHIEVEMENTS; i++) {
         if (achievements[i].unlocked) {
             achievementBits |= (1 << i);
         }
+        if (achievements[i].shown) {
+            shownBits |= (1 << i);
+        }
     }
     prefs.putUInt("achieve", achievementBits);
+    prefs.putUInt("shown", shownBits);
     prefs.end();
 }
 
@@ -835,10 +852,12 @@ void loadStats() {
     stats.fastestAnswer = prefs.getULong("fastest", 0);
     stats.tablesCompleted = prefs.getInt("tables", 0);
 
-    // Load achievements
+    // Load achievements (unlocked and shown status)
     uint32_t achievementBits = prefs.getUInt("achieve", 0);
+    uint32_t shownBits = prefs.getUInt("shown", 0);
     for (int i = 0; i < NUM_ACHIEVEMENTS; i++) {
         achievements[i].unlocked = (achievementBits & (1 << i)) != 0;
+        achievements[i].shown = (shownBits & (1 << i)) != 0;
     }
     prefs.end();
 
