@@ -129,6 +129,7 @@ unsigned long questionStartTime = 0;
 unsigned long lastTouchTime = 0;
 int selectedAnswer = -1;
 bool showingFeedback = false;
+bool lastAnswerCorrect = false;  // Track for redrawing feedback over confetti
 unsigned long feedbackStartTime = 0;
 
 // Confetti particles
@@ -309,12 +310,22 @@ void loop() {
             updateConfetti();
             drawConfetti();
 
-            // Stop confetti after 3 seconds
-            if (now - confettiStartTime > 3000) {
+            // Redraw feedback text that confetti may have erased
+            if (showingFeedback) {
+                drawResultScreen(lastAnswerCorrect);
+            }
+
+            // Stop confetti after 2 seconds
+            if (now - confettiStartTime > 2000) {
                 confettiActive = false;
-                // Redraw current screen
+                // Redraw current screen to clean up
                 if (currentScreen == SCREEN_QUIZ) {
-                    drawQuizScreen();
+                    if (showingFeedback) {
+                        drawQuizScreen();
+                        drawResultScreen(lastAnswerCorrect);
+                    } else {
+                        drawQuizScreen();
+                    }
                 }
             }
         }
@@ -691,6 +702,7 @@ void checkAnswer(int answerIndex) {
     bool correct = (answerIndex == currentQuestion.correctIndex);
 
     showingFeedback = true;
+    lastAnswerCorrect = correct;  // Store for redrawing over confetti
     feedbackStartTime = millis();
 
     if (correct) {
