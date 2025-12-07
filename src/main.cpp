@@ -131,7 +131,9 @@ unsigned long lastTouchTime = 0;
 int selectedAnswer = -1;
 bool showingFeedback = false;
 bool lastAnswerCorrect = false;  // Track for redrawing feedback over confetti
+int feedbackMessageIndex = 0;    // Store which "AWESOME/GREAT/etc" message to show
 unsigned long feedbackStartTime = 0;
+int currentAchievementIndex = -1; // Track which achievement is being displayed
 
 // Confetti particles
 #define MAX_CONFETTI 50
@@ -199,6 +201,7 @@ void drawMenuScreen();
 void drawQuizScreen();
 void drawResultScreen(bool correct);
 void drawAchievementPopup(int achievementIndex);
+void redrawAchievementText(int achievementIndex);
 void drawStatsScreen();
 
 void generateQuestion();
@@ -334,6 +337,10 @@ void loop() {
         if (currentScreen == SCREEN_ACHIEVEMENT) {
             updateStars();
             drawStars();
+            // Redraw text that stars may have erased
+            if (currentAchievementIndex >= 0) {
+                redrawAchievementText(currentAchievementIndex);
+            }
         }
     }
 
@@ -346,6 +353,7 @@ void loop() {
             if (achievements[i].unlocked && !achievements[i].shown) {
                 // This achievement was just unlocked - show it!
                 achievements[i].shown = true;
+                currentAchievementIndex = i;
                 currentScreen = SCREEN_ACHIEVEMENT;
                 drawAchievementPopup(i);
                 initStars();
@@ -703,6 +711,7 @@ void checkAnswer(int answerIndex) {
 
     showingFeedback = true;
     lastAnswerCorrect = correct;  // Store for redrawing over confetti
+    feedbackMessageIndex = random(0, 5);  // Pick random message once
     feedbackStartTime = millis();
 
     if (correct) {
@@ -1129,10 +1138,9 @@ void drawResultScreen(bool correct) {
     tft.setTextColor(COLOR_WHITE);
 
     if (correct) {
-        // Random positive message
+        // Positive message (index set once in checkAnswer)
         const char* messages[] = {"AWESOME!", "GREAT!", "CORRECT!", "PERFECT!", "YES!"};
-        int msgIdx = random(0, 5);
-        drawCenteredText(messages[msgIdx], 50, 3, COLOR_WHITE);
+        drawCenteredText(messages[feedbackMessageIndex], 50, 3, COLOR_WHITE);
 
         // Show streak
         if (stats.currentStreak > 1) {
@@ -1195,6 +1203,35 @@ void drawAchievementPopup(int achievementIndex) {
     drawCenteredText(achievements[achievementIndex].description, 210, 1, COLOR_YELLOW);
 
     // Tap to continue
+    drawCenteredText("Tap to continue", 230, 1, COLOR_WHITE);
+}
+
+void redrawAchievementText(int achievementIndex) {
+    // Redraw just the text portions (to fix star animation erasing text)
+    // Don't fill screen - just redraw text with background behind it
+
+    // Title text background and text
+    tft.fillRect(0, 15, 320, 70, COLOR_BG);
+    tft.setTextSize(3);
+    drawCenteredText("ACHIEVEMENT", 20, 3, COLOR_GOLD);
+    drawCenteredText("UNLOCKED!", 55, 3, COLOR_GOLD);
+
+    // Icon (redraw the box and icon)
+    fillRoundedRect(120, 90, 80, 80, 20, COLOR_GOLD);
+    tft.setTextSize(4);
+    tft.setTextColor(COLOR_BLACK);
+    tft.setCursor(145, 110);
+    tft.print(achievements[achievementIndex].icon);
+
+    // Achievement name background and text
+    tft.fillRect(0, 180, 320, 25, COLOR_BG);
+    tft.setTextSize(2);
+    drawCenteredText(achievements[achievementIndex].name, 185, 2, COLOR_WHITE);
+
+    // Description background and text
+    tft.fillRect(0, 205, 320, 35, COLOR_BG);
+    tft.setTextSize(1);
+    drawCenteredText(achievements[achievementIndex].description, 210, 1, COLOR_YELLOW);
     drawCenteredText("Tap to continue", 230, 1, COLOR_WHITE);
 }
 
