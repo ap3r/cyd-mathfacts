@@ -91,7 +91,8 @@ enum GameScreen {
     SCREEN_QUIZ,
     SCREEN_RESULT,
     SCREEN_ACHIEVEMENT,
-    SCREEN_STATS
+    SCREEN_STATS,
+    SCREEN_ROUND_END
 };
 
 struct Question {
@@ -160,6 +161,19 @@ struct Star {
 };
 Star stars[MAX_STARS];
 
+// Character state (little buddy in corner)
+struct Character {
+    float y;           // Vertical position (for jumping)
+    float vy;          // Vertical velocity
+    int baseY;         // Ground position
+    int x;             // Horizontal position
+    bool jumping;      // Is currently jumping
+    bool dead;         // Is dead (wrong answer)
+    unsigned long deadTime;  // When character died
+    int frame;         // Animation frame
+};
+Character buddy = {0, 0, 200, 280, false, false, 0, 0};
+
 // Achievement definitions
 #define NUM_ACHIEVEMENTS 12
 Achievement achievements[NUM_ACHIEVEMENTS] = {
@@ -203,6 +217,11 @@ void drawResultScreen(bool correct);
 void drawAchievementPopup(int achievementIndex);
 void redrawAchievementText(int achievementIndex);
 void drawStatsScreen();
+void drawRoundEndScreen();
+void drawCharacter();
+void updateCharacter();
+void buddyJump();
+void buddyDie();
 
 void generateQuestion();
 void checkAnswer(int answerIndex);
@@ -342,6 +361,14 @@ void loop() {
                 redrawAchievementText(currentAchievementIndex);
             }
         }
+
+        // Update character animation on quiz screen
+        if (currentScreen == SCREEN_QUIZ) {
+            updateCharacter();
+            // Redraw character area to animate
+            tft.fillRect(buddy.x - 25, buddy.baseY - 35, 50, 65, COLOR_BG);
+            drawCharacter();
+        }
     }
 
     // Handle feedback timeout
@@ -359,6 +386,13 @@ void loop() {
                 initStars();
                 return;
             }
+        }
+
+        // Check if round is complete (10 questions)
+        if (stats.questionsThisRound >= 10) {
+            currentScreen = SCREEN_ROUND_END;
+            drawRoundEndScreen();
+            return;
         }
 
         // Generate next question
@@ -622,6 +656,17 @@ void handleTouch(int x, int y) {
                 drawMenuScreen();
             }
             break;
+
+        case SCREEN_ROUND_END:
+            // Tap anywhere to start next round
+            stats.questionsThisRound = 0;
+            stats.correctThisRound = 0;
+            buddy.dead = false;  // Revive character for new round
+            buddy.y = 0;
+            currentScreen = SCREEN_QUIZ;
+            generateQuestion();
+            drawQuizScreen();
+            break;
     }
 }
 
@@ -738,10 +783,12 @@ void checkAnswer(int answerIndex) {
 
         animateCorrect();
         startConfetti();
+        buddyJump();
     } else {
         stats.totalWrong++;
         stats.currentStreak = 0;
         animateWrong();
+        buddyDie();
     }
 
     checkAchievements();
@@ -981,6 +1028,90 @@ void drawStars() {
 }
 
 // ============================================================================
+// CHARACTER (Little buddy in corner)
+// ============================================================================
+
+void drawCharacter() {
+    int x = buddy.x;
+    int y = buddy.baseY - (int)buddy.y;  // y offset for jumping
+
+    if (buddy.dead) {
+        // Dead character - X eyes, lying down
+        // Body (horizontal, fallen over)
+        tft.fillRoundRect(x - 15, y + 10, 30, 12, 4, COLOR_YELLOW);
+        // Head
+        tft.fillCircle(x - 18, y + 8, 8, COLOR_YELLOW);
+        // X eyes
+        tft.drawLine(x - 21, y + 5, x - 17, y + 9, COLOR_BLACK);
+        tft.drawLine(x - 17, y + 5, x - 21, y + 9, COLOR_BLACK);
+        tft.drawLine(x - 16, y + 5, x - 12, y + 9, COLOR_BLACK);
+        tft.drawLine(x - 12, y + 5, x - 16, y + 9, COLOR_BLACK);
+        // Tongue out
+        tft.fillRect(x - 20, y + 12, 4, 3, COLOR_RED);
+    } else {
+        // Normal character - simple stick figure with big head
+        // Body
+        tft.fillRoundRect(x - 6, y - 5, 12, 20, 4, COLOR_YELLOW);
+        // Head
+        tft.fillCircle(x, y - 15, 10, COLOR_YELLOW);
+        // Eyes (depending on jumping)
+        if (buddy.jumping) {
+            // Happy eyes (arcs)
+            tft.drawLine(x - 5, y - 17, x - 3, y - 15, COLOR_BLACK);
+            tft.drawLine(x - 3, y - 15, x - 1, y - 17, COLOR_BLACK);
+            tft.drawLine(x + 1, y - 17, x + 3, y - 15, COLOR_BLACK);
+            tft.drawLine(x + 3, y - 15, x + 5, y - 17, COLOR_BLACK);
+        } else {
+            // Normal eyes (dots)
+            tft.fillCircle(x - 4, y - 17, 2, COLOR_BLACK);
+            tft.fillCircle(x + 4, y - 17, 2, COLOR_BLACK);
+        }
+        // Mouth (smile)
+        tft.drawLine(x - 4, y - 10, x, y - 8, COLOR_BLACK);
+        tft.drawLine(x, y - 8, x + 4, y - 10, COLOR_BLACK);
+        // Legs
+        tft.fillRect(x - 5, y + 15, 4, 8, COLOR_YELLOW);
+        tft.fillRect(x + 1, y + 15, 4, 8, COLOR_YELLOW);
+        // Feet
+        tft.fillRect(x - 7, y + 21, 6, 3, COLOR_ORANGE);
+        tft.fillRect(x + 1, y + 21, 6, 3, COLOR_ORANGE);
+    }
+}
+
+void updateCharacter() {
+    if (buddy.jumping) {
+        buddy.y += buddy.vy;
+        buddy.vy -= 0.8f;  // Gravity
+
+        if (buddy.y <= 0) {
+            buddy.y = 0;
+            buddy.vy = 0;
+            buddy.jumping = false;
+        }
+    }
+
+    // Revive after 2 seconds
+    if (buddy.dead && millis() - buddy.deadTime > 2000) {
+        buddy.dead = false;
+        buddy.y = 0;
+    }
+}
+
+void buddyJump() {
+    if (!buddy.dead && !buddy.jumping) {
+        buddy.jumping = true;
+        buddy.vy = 12.0f;  // Jump velocity
+    }
+}
+
+void buddyDie() {
+    buddy.dead = true;
+    buddy.deadTime = millis();
+    buddy.jumping = false;
+    buddy.y = 0;
+}
+
+// ============================================================================
 // SCREEN DRAWING
 // ============================================================================
 
@@ -1061,25 +1192,26 @@ void drawMenuScreen() {
 void drawQuizScreen() {
     tft.fillScreen(COLOR_BG);
 
-    // Header with streak
+    // Header with progress and streak
     tft.setTextSize(1);
     tft.setTextColor(COLOR_WHITE);
     tft.setCursor(5, 5);
-    tft.printf("Streak: %d", stats.currentStreak);
+    tft.printf("Q: %d/10", stats.questionsThisRound);
 
-    // Show fire emoji if on a streak
-    if (stats.currentStreak >= 3) {
-        tft.setTextColor(COLOR_ORANGE);
-        tft.setCursor(100, 5);
-        for (int i = 0; i < min(stats.currentStreak / 3, 5); i++) {
-            tft.print("*");  // Fire representation
+    // Show streak with fire if on a streak
+    if (stats.currentStreak >= 1) {
+        tft.setTextColor(stats.currentStreak >= 3 ? COLOR_ORANGE : COLOR_WHITE);
+        tft.setCursor(70, 5);
+        tft.printf("x%d", stats.currentStreak);
+        if (stats.currentStreak >= 3) {
+            tft.print("!");
         }
     }
 
-    // Score
+    // Round score (correct this round)
     tft.setTextColor(COLOR_WHITE);
-    tft.setCursor(SCREEN_WIDTH - 80, 5);
-    tft.printf("Score: %d", stats.totalCorrect);
+    tft.setCursor(SCREEN_WIDTH - 50, 5);
+    tft.printf("%d/10", stats.correctThisRound);
 
     // Question box
     fillRoundedRect(20, 30, 280, 85, 15, COLOR_BG_LIGHT);
@@ -1128,6 +1260,9 @@ void drawQuizScreen() {
         tft.setCursor(ansX, ansY);
         tft.print(answerText);
     }
+
+    // Draw character buddy
+    drawCharacter();
 }
 
 void drawResultScreen(bool correct) {
@@ -1233,6 +1368,57 @@ void redrawAchievementText(int achievementIndex) {
     tft.setTextSize(1);
     drawCenteredText(achievements[achievementIndex].description, 210, 1, COLOR_YELLOW);
     drawCenteredText("Tap to continue", 230, 1, COLOR_WHITE);
+}
+
+void drawRoundEndScreen() {
+    tft.fillScreen(COLOR_BG);
+
+    // Get score for this round
+    int score = stats.correctThisRound;
+
+    // Title based on performance
+    tft.setTextSize(3);
+    if (score == 10) {
+        drawCenteredText("PERFECT!", 20, 3, COLOR_GOLD);
+        startConfetti();
+    } else if (score >= 8) {
+        drawCenteredText("GREAT JOB!", 20, 3, COLOR_GREEN);
+    } else if (score >= 6) {
+        drawCenteredText("GOOD TRY!", 20, 3, COLOR_YELLOW);
+    } else {
+        drawCenteredText("KEEP TRYING!", 20, 3, COLOR_ORANGE);
+    }
+
+    // Round complete subtitle
+    tft.setTextSize(2);
+    drawCenteredText("Round Complete!", 55, 2, COLOR_WHITE);
+
+    // Big score display
+    fillRoundedRect(80, 85, 160, 80, 20, COLOR_BG_LIGHT);
+    tft.setTextSize(5);
+    char scoreText[8];
+    sprintf(scoreText, "%d/10", score);
+    tft.setTextColor(score >= 8 ? COLOR_GREEN : (score >= 6 ? COLOR_YELLOW : COLOR_ORANGE));
+    int scoreWidth = strlen(scoreText) * 30;
+    tft.setCursor((320 - scoreWidth) / 2, 105);
+    tft.print(scoreText);
+
+    // Stats for this round
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(80, 175);
+    tft.printf("Correct: %d  Wrong: %d", score, 10 - score);
+
+    if (stats.currentStreak > 0) {
+        tft.setCursor(80, 190);
+        tft.printf("Current Streak: %d", stats.currentStreak);
+    }
+
+    // Continue button
+    fillRoundedRect(60, 205, 200, 30, 10, COLOR_GREEN);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_WHITE);
+    drawCenteredText("NEXT ROUND", 210, 2, COLOR_WHITE);
 }
 
 void drawStatsScreen() {
