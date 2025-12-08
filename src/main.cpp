@@ -169,10 +169,12 @@ struct Character {
     int x;             // Horizontal position
     bool jumping;      // Is currently jumping
     bool dead;         // Is dead (wrong answer)
+    bool dancing;      // Is dancing (round end)
     unsigned long deadTime;  // When character died
     int frame;         // Animation frame
+    unsigned long lastFrameTime;
 };
-Character buddy = {0, 0, 200, 280, false, false, 0, 0};
+Character buddy = {0, 0, 22, 300, false, false, false, 0, 0, 0};
 
 // Achievement definitions
 #define NUM_ACHIEVEMENTS 12
@@ -218,6 +220,7 @@ void drawAchievementPopup(int achievementIndex);
 void redrawAchievementText(int achievementIndex);
 void drawStatsScreen();
 void drawRoundEndScreen();
+void redrawRoundEndText();
 void drawCharacter();
 void updateCharacter();
 void buddyJump();
@@ -365,9 +368,22 @@ void loop() {
         // Update character animation on quiz screen
         if (currentScreen == SCREEN_QUIZ) {
             updateCharacter();
-            // Redraw character area to animate
-            tft.fillRect(buddy.x - 25, buddy.baseY - 35, 50, 65, COLOR_BG);
+            // Redraw character area to animate (smaller area for smaller character)
+            tft.fillRect(buddy.x - 15, buddy.baseY - 15, 25, 30, COLOR_BG);
             drawCharacter();
+        }
+
+        // Update character dancing on round-end screen
+        if (currentScreen == SCREEN_ROUND_END) {
+            updateCharacter();
+            // Clear and redraw dancing character
+            tft.fillRect(buddy.x - 15, buddy.baseY - 15, 25, 30, COLOR_BG);
+            drawCharacter();
+
+            // Redraw round-end text if confetti is active
+            if (confettiActive) {
+                redrawRoundEndText();
+            }
         }
     }
 
@@ -662,6 +678,7 @@ void handleTouch(int x, int y) {
             stats.questionsThisRound = 0;
             stats.correctThisRound = 0;
             buddy.dead = false;  // Revive character for new round
+            buddy.dancing = false;  // Stop dancing
             buddy.y = 0;
             currentScreen = SCREEN_QUIZ;
             generateQuestion();
@@ -1035,58 +1052,76 @@ void drawCharacter() {
     int x = buddy.x;
     int y = buddy.baseY - (int)buddy.y;  // y offset for jumping
 
+    // Dance offset for wiggling
+    int danceOffset = 0;
+    if (buddy.dancing) {
+        danceOffset = (buddy.frame % 2 == 0) ? -1 : 1;
+    }
+
     if (buddy.dead) {
-        // Dead character - X eyes, lying down
+        // Dead character - X eyes, lying down (smaller)
         // Body (horizontal, fallen over)
-        tft.fillRoundRect(x - 15, y + 10, 30, 12, 4, COLOR_YELLOW);
+        tft.fillRoundRect(x - 8, y + 3, 16, 6, 2, COLOR_YELLOW);
         // Head
-        tft.fillCircle(x - 18, y + 8, 8, COLOR_YELLOW);
+        tft.fillCircle(x - 10, y + 2, 5, COLOR_YELLOW);
         // X eyes
-        tft.drawLine(x - 21, y + 5, x - 17, y + 9, COLOR_BLACK);
-        tft.drawLine(x - 17, y + 5, x - 21, y + 9, COLOR_BLACK);
-        tft.drawLine(x - 16, y + 5, x - 12, y + 9, COLOR_BLACK);
-        tft.drawLine(x - 12, y + 5, x - 16, y + 9, COLOR_BLACK);
+        tft.drawLine(x - 12, y, x - 9, y + 3, COLOR_BLACK);
+        tft.drawLine(x - 9, y, x - 12, y + 3, COLOR_BLACK);
+        tft.drawLine(x - 8, y, x - 5, y + 3, COLOR_BLACK);
+        tft.drawLine(x - 5, y, x - 8, y + 3, COLOR_BLACK);
         // Tongue out
-        tft.fillRect(x - 20, y + 12, 4, 3, COLOR_RED);
+        tft.fillRect(x - 11, y + 5, 2, 2, COLOR_RED);
     } else {
-        // Normal character - simple stick figure with big head
+        // Smaller character - about half size
+        int xOff = danceOffset;
         // Body
-        tft.fillRoundRect(x - 6, y - 5, 12, 20, 4, COLOR_YELLOW);
+        tft.fillRoundRect(x - 3 + xOff, y - 2, 6, 10, 2, COLOR_YELLOW);
         // Head
-        tft.fillCircle(x, y - 15, 10, COLOR_YELLOW);
-        // Eyes (depending on jumping)
-        if (buddy.jumping) {
-            // Happy eyes (arcs)
-            tft.drawLine(x - 5, y - 17, x - 3, y - 15, COLOR_BLACK);
-            tft.drawLine(x - 3, y - 15, x - 1, y - 17, COLOR_BLACK);
-            tft.drawLine(x + 1, y - 17, x + 3, y - 15, COLOR_BLACK);
-            tft.drawLine(x + 3, y - 15, x + 5, y - 17, COLOR_BLACK);
+        tft.fillCircle(x + xOff, y - 7, 5, COLOR_YELLOW);
+        // Eyes (depending on state)
+        if (buddy.jumping || buddy.dancing) {
+            // Happy eyes (arcs) - smaller
+            tft.drawPixel(x - 2 + xOff, y - 8, COLOR_BLACK);
+            tft.drawPixel(x - 1 + xOff, y - 9, COLOR_BLACK);
+            tft.drawPixel(x + 1 + xOff, y - 9, COLOR_BLACK);
+            tft.drawPixel(x + 2 + xOff, y - 8, COLOR_BLACK);
         } else {
             // Normal eyes (dots)
-            tft.fillCircle(x - 4, y - 17, 2, COLOR_BLACK);
-            tft.fillCircle(x + 4, y - 17, 2, COLOR_BLACK);
+            tft.fillCircle(x - 2 + xOff, y - 8, 1, COLOR_BLACK);
+            tft.fillCircle(x + 2 + xOff, y - 8, 1, COLOR_BLACK);
         }
         // Mouth (smile)
-        tft.drawLine(x - 4, y - 10, x, y - 8, COLOR_BLACK);
-        tft.drawLine(x, y - 8, x + 4, y - 10, COLOR_BLACK);
-        // Legs
-        tft.fillRect(x - 5, y + 15, 4, 8, COLOR_YELLOW);
-        tft.fillRect(x + 1, y + 15, 4, 8, COLOR_YELLOW);
+        tft.drawPixel(x - 1 + xOff, y - 4, COLOR_BLACK);
+        tft.drawPixel(x + xOff, y - 3, COLOR_BLACK);
+        tft.drawPixel(x + 1 + xOff, y - 4, COLOR_BLACK);
+        // Legs (alternate when dancing)
+        int legOffset = buddy.dancing ? (buddy.frame % 2 == 0 ? 1 : -1) : 0;
+        tft.fillRect(x - 3 + xOff, y + 8 + legOffset, 2, 4, COLOR_YELLOW);
+        tft.fillRect(x + 1 + xOff, y + 8 - legOffset, 2, 4, COLOR_YELLOW);
         // Feet
-        tft.fillRect(x - 7, y + 21, 6, 3, COLOR_ORANGE);
-        tft.fillRect(x + 1, y + 21, 6, 3, COLOR_ORANGE);
+        tft.fillRect(x - 4 + xOff, y + 11 + legOffset, 3, 2, COLOR_ORANGE);
+        tft.fillRect(x + 1 + xOff, y + 11 - legOffset, 3, 2, COLOR_ORANGE);
     }
 }
 
 void updateCharacter() {
     if (buddy.jumping) {
         buddy.y += buddy.vy;
-        buddy.vy -= 0.8f;  // Gravity
+        buddy.vy -= 0.6f;  // Gravity
 
         if (buddy.y <= 0) {
             buddy.y = 0;
             buddy.vy = 0;
             buddy.jumping = false;
+        }
+    }
+
+    // Update dance animation frame
+    if (buddy.dancing) {
+        unsigned long now = millis();
+        if (now - buddy.lastFrameTime > 150) {  // Dance speed
+            buddy.frame++;
+            buddy.lastFrameTime = now;
         }
     }
 
@@ -1100,7 +1135,7 @@ void updateCharacter() {
 void buddyJump() {
     if (!buddy.dead && !buddy.jumping) {
         buddy.jumping = true;
-        buddy.vy = 12.0f;  // Jump velocity
+        buddy.vy = 8.0f;  // Jump velocity (smaller for small character)
     }
 }
 
@@ -1418,6 +1453,64 @@ void drawRoundEndScreen() {
     fillRoundedRect(60, 205, 200, 30, 10, COLOR_GREEN);
     tft.setTextSize(2);
     tft.setTextColor(COLOR_WHITE);
+    drawCenteredText("NEXT ROUND", 210, 2, COLOR_WHITE);
+
+    // Start character dancing
+    buddy.dancing = true;
+    buddy.dead = false;
+    buddy.frame = 0;
+    buddy.lastFrameTime = millis();
+
+    // Draw character
+    drawCharacter();
+}
+
+void redrawRoundEndText() {
+    // Redraw text that confetti may have erased
+    int score = stats.correctThisRound;
+
+    // Title background and text
+    tft.fillRect(0, 15, 320, 45, COLOR_BG);
+    tft.setTextSize(3);
+    if (score == 10) {
+        drawCenteredText("PERFECT!", 20, 3, COLOR_GOLD);
+    } else if (score >= 8) {
+        drawCenteredText("GREAT JOB!", 20, 3, COLOR_GREEN);
+    } else if (score >= 6) {
+        drawCenteredText("GOOD TRY!", 20, 3, COLOR_YELLOW);
+    } else {
+        drawCenteredText("KEEP TRYING!", 20, 3, COLOR_ORANGE);
+    }
+
+    // Subtitle
+    tft.fillRect(0, 50, 320, 25, COLOR_BG);
+    tft.setTextSize(2);
+    drawCenteredText("Round Complete!", 55, 2, COLOR_WHITE);
+
+    // Score box
+    fillRoundedRect(80, 85, 160, 80, 20, COLOR_BG_LIGHT);
+    tft.setTextSize(5);
+    char scoreText[8];
+    sprintf(scoreText, "%d/10", score);
+    tft.setTextColor(score >= 8 ? COLOR_GREEN : (score >= 6 ? COLOR_YELLOW : COLOR_ORANGE));
+    int scoreWidth = strlen(scoreText) * 30;
+    tft.setCursor((320 - scoreWidth) / 2, 105);
+    tft.print(scoreText);
+
+    // Stats
+    tft.fillRect(0, 170, 320, 30, COLOR_BG);
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(80, 175);
+    tft.printf("Correct: %d  Wrong: %d", score, 10 - score);
+    if (stats.currentStreak > 0) {
+        tft.setCursor(80, 190);
+        tft.printf("Current Streak: %d", stats.currentStreak);
+    }
+
+    // Continue button
+    fillRoundedRect(60, 205, 200, 30, 10, COLOR_GREEN);
+    tft.setTextSize(2);
     drawCenteredText("NEXT ROUND", 210, 2, COLOR_WHITE);
 }
 
