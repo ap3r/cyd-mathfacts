@@ -85,7 +85,17 @@ Preferences prefs;
 // GAME STATE
 // ============================================================================
 
+// Which minigame is currently active
+enum ActiveGame {
+    GAME_NONE,          // At launcher
+    GAME_MATHFACTS,     // Times table quiz
+    GAME_COMING_SOON    // Placeholder for future game
+};
+
 enum GameScreen {
+    // Launcher screens
+    SCREEN_LAUNCHER,
+    // MathFacts screens
     SCREEN_SPLASH,
     SCREEN_MENU,
     SCREEN_QUIZ,
@@ -94,6 +104,8 @@ enum GameScreen {
     SCREEN_STATS,
     SCREEN_ROUND_END
 };
+
+ActiveGame currentGame = GAME_NONE;
 
 struct Question {
     int num1;
@@ -212,6 +224,10 @@ const uint16_t buttonColors[] = {
 // FUNCTION DECLARATIONS
 // ============================================================================
 
+// Launcher
+void drawLauncherScreen();
+
+// MathFacts game screens
 void drawSplashScreen();
 void drawMenuScreen();
 void drawQuizScreen();
@@ -312,10 +328,11 @@ void setup() {
     initConfetti();
     initStars();
 
-    // Show splash screen
-    currentScreen = SCREEN_SPLASH;
+    // Show launcher screen
+    currentGame = GAME_NONE;
+    currentScreen = SCREEN_LAUNCHER;
     tft.fillScreen(COLOR_BG);
-    drawSplashScreen();
+    drawLauncherScreen();
 
     Serial.println("Setup complete!");
 }
@@ -601,14 +618,40 @@ void handleTouch(int x, int y) {
     Serial.printf("Touch at (%d, %d) - Screen: %d\n", x, y, currentScreen);
 
     switch (currentScreen) {
+        case SCREEN_LAUNCHER:
+            // Math Facts button (y: 75-145)
+            if (y >= 75 && y <= 145) {
+                currentGame = GAME_MATHFACTS;
+                currentScreen = SCREEN_SPLASH;
+                drawSplashScreen();
+            }
+            // Coming Soon button - do nothing or show message
+            else if (y >= 160 && y <= 230) {
+                // Flash the button to show it was pressed but unavailable
+                fillRoundedRect(30, 160, 260, 70, 15, 0x5ACB);  // Slightly lighter gray
+                delay(100);
+                fillRoundedRect(30, 160, 260, 70, 15, 0x4208);  // Back to gray
+                tft.setTextSize(2);
+                drawCenteredText("COMING SOON", 180, 2, 0x8410);
+                tft.setTextSize(1);
+                drawCenteredText("More games on the way!", 205, 1, 0x6B4D);
+            }
+            break;
+
         case SCREEN_SPLASH:
             currentScreen = SCREEN_MENU;
             drawMenuScreen();
             break;
 
         case SCREEN_MENU:
+            // Back button (top-left area)
+            if (x < 60 && y < 30) {
+                currentGame = GAME_NONE;
+                currentScreen = SCREEN_LAUNCHER;
+                drawLauncherScreen();
+            }
             // "Play" button area (center of screen)
-            if (y >= 80 && y <= 160) {
+            else if (y >= 80 && y <= 160) {
                 stats.questionsThisRound = 0;
                 stats.correctThisRound = 0;
                 generateQuestion();
@@ -1150,6 +1193,38 @@ void buddyDie() {
 // SCREEN DRAWING
 // ============================================================================
 
+void drawLauncherScreen() {
+    tft.fillScreen(COLOR_BG);
+
+    // Title
+    tft.setTextSize(3);
+    drawCenteredText("MINI GAMES", 15, 3, COLOR_GOLD);
+
+    tft.setTextSize(1);
+    drawCenteredText("Select a game to play", 50, 1, COLOR_WHITE);
+
+    // Game 1: Math Facts - big button
+    fillRoundedRect(30, 75, 260, 70, 15, COLOR_GREEN);
+    tft.setTextSize(3);
+    drawCenteredText("MATH", 85, 3, COLOR_WHITE);
+    drawCenteredText("FACTS", 115, 2, COLOR_WHITE);
+
+    // Small icon/decoration for Math Facts
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_YELLOW);
+    tft.setCursor(45, 95);
+    tft.print("123");
+    tft.setCursor(255, 95);
+    tft.print("x");
+
+    // Game 2: Coming Soon - placeholder button
+    fillRoundedRect(30, 160, 260, 70, 15, 0x4208);  // Gray
+    tft.setTextSize(2);
+    drawCenteredText("COMING SOON", 180, 2, 0x8410);  // Light gray text
+    tft.setTextSize(1);
+    drawCenteredText("More games on the way!", 205, 1, 0x6B4D);
+}
+
 void drawSplashScreen() {
     tft.fillScreen(COLOR_BG);
 
@@ -1195,6 +1270,12 @@ void drawSplashScreen() {
 
 void drawMenuScreen() {
     tft.fillScreen(COLOR_BG);
+
+    // Back button (top-left)
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(5, 5);
+    tft.print("< BACK");
 
     // Title
     tft.setTextSize(3);
