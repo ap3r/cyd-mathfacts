@@ -102,7 +102,8 @@ enum GameScreen {
     SCREEN_RESULT,
     SCREEN_ACHIEVEMENT,
     SCREEN_STATS,
-    SCREEN_ROUND_END
+    SCREEN_ROUND_END,
+    SCREEN_SETTINGS
 };
 
 ActiveGame currentGame = GAME_NONE;
@@ -147,6 +148,9 @@ bool lastAnswerCorrect = false;  // Track for redrawing feedback over confetti
 int feedbackMessageIndex = 0;    // Store which "AWESOME/GREAT/etc" message to show
 unsigned long feedbackStartTime = 0;
 int currentAchievementIndex = -1; // Track which achievement is being displayed
+
+// Settings
+int selectedTable = 0;  // 0 = all tables (random 1-12), 1-12 = specific table only
 
 // Confetti particles
 #define MAX_CONFETTI 50
@@ -237,6 +241,7 @@ void redrawAchievementText(int achievementIndex);
 void drawStatsScreen();
 void drawRoundEndScreen();
 void redrawRoundEndText();
+void drawSettingsScreen();
 void drawCharacter();
 void updateCharacter();
 void buddyJump();
@@ -650,16 +655,21 @@ void handleTouch(int x, int y) {
                 currentScreen = SCREEN_LAUNCHER;
                 drawLauncherScreen();
             }
-            // "Play" button area (center of screen)
-            else if (y >= 80 && y <= 160) {
+            // "Play" button area (y=70-130)
+            else if (y >= 70 && y <= 130) {
                 stats.questionsThisRound = 0;
                 stats.correctThisRound = 0;
                 generateQuestion();
                 currentScreen = SCREEN_QUIZ;
                 drawQuizScreen();
             }
-            // "Stats" button area (bottom)
-            else if (y >= 180 && y <= 230) {
+            // "Settings" button area (left button, y=145-190)
+            else if (x >= 20 && x <= 155 && y >= 145 && y <= 190) {
+                currentScreen = SCREEN_SETTINGS;
+                drawSettingsScreen();
+            }
+            // "Stats" button area (right button, y=145-190)
+            else if (x >= 165 && x <= 300 && y >= 145 && y <= 190) {
                 currentScreen = SCREEN_STATS;
                 drawStatsScreen();
             }
@@ -716,6 +726,47 @@ void handleTouch(int x, int y) {
             }
             break;
 
+        case SCREEN_SETTINGS:
+            // Back button (top left area)
+            if (x < 80 && y < 30) {
+                currentScreen = SCREEN_MENU;
+                drawMenuScreen();
+            }
+            // "ALL TABLES" button (y=45-80)
+            else if (y >= 45 && y <= 80) {
+                selectedTable = 0;
+                saveStats();  // Persist selection
+                drawSettingsScreen();  // Redraw to show selection
+            }
+            // Table buttons grid (1-12)
+            // Grid: 4 cols x 3 rows, btnWidth=65, btnHeight=40, startX=20, startY=90, gapX=10, gapY=8
+            else if (y >= 90 && y <= 230) {
+                int btnWidth = 65;
+                int btnHeight = 40;
+                int startX = 20;
+                int startY = 90;
+                int gapX = 10;
+                int gapY = 8;
+                int cols = 4;
+
+                for (int i = 1; i <= 12; i++) {
+                    int idx = i - 1;
+                    int col = idx % cols;
+                    int row = idx / cols;
+                    int btnX = startX + col * (btnWidth + gapX);
+                    int btnY = startY + row * (btnHeight + gapY);
+
+                    if (x >= btnX && x <= btnX + btnWidth &&
+                        y >= btnY && y <= btnY + btnHeight) {
+                        selectedTable = i;
+                        saveStats();  // Persist selection
+                        drawSettingsScreen();  // Redraw to show selection
+                        break;
+                    }
+                }
+            }
+            break;
+
         case SCREEN_ROUND_END:
             // Tap anywhere to start next round
             stats.questionsThisRound = 0;
@@ -735,9 +786,22 @@ void handleTouch(int x, int y) {
 // ============================================================================
 
 void generateQuestion() {
-    // Random numbers from 1-12
-    currentQuestion.num1 = random(MIN_TABLE, MAX_TABLE + 1);
-    currentQuestion.num2 = random(MIN_TABLE, MAX_TABLE + 1);
+    // Generate numbers based on selected table mode
+    if (selectedTable == 0) {
+        // All tables mode: random numbers from 1-12 for both
+        currentQuestion.num1 = random(MIN_TABLE, MAX_TABLE + 1);
+        currentQuestion.num2 = random(MIN_TABLE, MAX_TABLE + 1);
+    } else {
+        // Specific table mode: fix num1, randomize num2
+        currentQuestion.num1 = selectedTable;
+        currentQuestion.num2 = random(MIN_TABLE, MAX_TABLE + 1);
+        // Randomly swap to vary question presentation (e.g., "2 x 5" vs "5 x 2")
+        if (random(0, 2) == 0) {
+            int temp = currentQuestion.num1;
+            currentQuestion.num1 = currentQuestion.num2;
+            currentQuestion.num2 = temp;
+        }
+    }
     currentQuestion.correctAnswer = currentQuestion.num1 * currentQuestion.num2;
 
     // Generate wrong answers that are plausible
@@ -941,6 +1005,7 @@ void saveStats() {
     prefs.putInt("perfect", stats.perfectRounds);
     prefs.putULong("fastest", stats.fastestAnswer);
     prefs.putInt("tables", stats.tablesCompleted);
+    prefs.putInt("selTable", selectedTable);  // Save selected table mode
 
     // Save achievements (unlocked and shown status)
     uint32_t achievementBits = 0;
@@ -967,6 +1032,7 @@ void loadStats() {
     stats.perfectRounds = prefs.getInt("perfect", 0);
     stats.fastestAnswer = prefs.getULong("fastest", 0);
     stats.tablesCompleted = prefs.getInt("tables", 0);
+    selectedTable = prefs.getInt("selTable", 0);  // Load selected table mode (0 = all)
 
     // Load achievements (unlocked and shown status)
     uint32_t achievementBits = prefs.getUInt("achieve", 0);
@@ -977,7 +1043,7 @@ void loadStats() {
     }
     prefs.end();
 
-    Serial.printf("Loaded stats: %d correct, %d streak\n", stats.totalCorrect, stats.currentStreak);
+    Serial.printf("Loaded stats: %d correct, %d streak, table mode: %d\n", stats.totalCorrect, stats.currentStreak, selectedTable);
 }
 
 // ============================================================================
@@ -1251,10 +1317,16 @@ void drawSplashScreen() {
         tft.print(title2[i]);
     }
 
-    // Subtitle
+    // Subtitle - shows current mode
     tft.setTextSize(2);
     tft.setTextColor(COLOR_WHITE);
-    drawCenteredText("Times Tables 1-12", 170, 2, COLOR_WHITE);
+    if (selectedTable == 0) {
+        drawCenteredText("Times Tables 1-12", 170, 2, COLOR_WHITE);
+    } else {
+        char modeText[32];
+        sprintf(modeText, "Practicing %d's Table", selectedTable);
+        drawCenteredText(modeText, 170, 2, COLOR_CYAN);
+    }
 
     // Touch to start
     tft.setTextSize(1);
@@ -1282,17 +1354,35 @@ void drawMenuScreen() {
     tft.setTextColor(COLOR_YELLOW);
     drawCenteredText("MATH FACTS", 20, 3, COLOR_YELLOW);
 
+    // Show current mode below title
+    tft.setTextSize(1);
+    if (selectedTable == 0) {
+        drawCenteredText("Mode: All Tables (1-12)", 50, 1, COLOR_WHITE);
+    } else {
+        char modeText[32];
+        sprintf(modeText, "Mode: %d's Table", selectedTable);
+        drawCenteredText(modeText, 50, 1, COLOR_CYAN);
+    }
+
     // Play button
-    fillRoundedRect(60, 80, 200, 70, 15, COLOR_GREEN);
+    fillRoundedRect(60, 70, 200, 60, 15, COLOR_GREEN);
     tft.setTextColor(COLOR_WHITE);
     tft.setTextSize(3);
-    tft.setCursor(120, 100);
+    tft.setCursor(120, 85);
     tft.print("PLAY!");
 
-    // Stats button
-    fillRoundedRect(60, 170, 200, 50, 10, COLOR_CYAN);
+    // Settings button (left)
+    fillRoundedRect(20, 145, 135, 45, 10, COLOR_ORANGE);
     tft.setTextSize(2);
-    tft.setCursor(120, 185);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(35, 157);
+    tft.print("SETTINGS");
+
+    // Stats button (right)
+    fillRoundedRect(165, 145, 135, 45, 10, COLOR_CYAN);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(195, 157);
     tft.print("STATS");
 
     // Show streak if any
@@ -1301,7 +1391,7 @@ void drawMenuScreen() {
         tft.setTextColor(COLOR_ORANGE);
         char streakText[32];
         sprintf(streakText, "Current streak: %d", stats.currentStreak);
-        drawCenteredText(streakText, 230, 1, COLOR_ORANGE);
+        drawCenteredText(streakText, 205, 1, COLOR_ORANGE);
     }
 }
 
@@ -1697,6 +1787,87 @@ void drawStatsScreen() {
     tft.setTextColor(COLOR_WHITE);
     tft.setCursor(20, 220);
     tft.printf("Unlocked: %d/%d", unlockedCount, NUM_ACHIEVEMENTS);
+}
+
+void drawSettingsScreen() {
+    tft.fillScreen(COLOR_BG);
+
+    // Back button hint
+    tft.setTextSize(1);
+    tft.setTextColor(COLOR_WHITE);
+    tft.setCursor(5, 5);
+    tft.print("< Back");
+
+    // Title
+    tft.setTextSize(2);
+    drawCenteredText("SELECT TABLE", 5, 2, COLOR_YELLOW);
+
+    // Subtitle
+    tft.setTextSize(1);
+    drawCenteredText("Practice a specific times table", 28, 1, COLOR_WHITE);
+
+    // "ALL TABLES" button at top (special - wide button)
+    int allBtnY = 45;
+    uint16_t allColor = (selectedTable == 0) ? COLOR_GREEN : COLOR_BG_LIGHT;
+    fillRoundedRect(20, allBtnY, 280, 35, 8, allColor);
+    tft.setTextSize(2);
+    tft.setTextColor(COLOR_WHITE);
+    drawCenteredText("ALL TABLES", allBtnY + 8, 2, COLOR_WHITE);
+    if (selectedTable == 0) {
+        tft.drawRoundRect(18, allBtnY - 2, 284, 39, 10, COLOR_YELLOW);
+    }
+
+    // Grid of table buttons (1-12)
+    // 4 columns x 3 rows
+    int btnWidth = 65;
+    int btnHeight = 40;
+    int startX = 20;
+    int startY = 90;
+    int gapX = 10;
+    int gapY = 8;
+    int cols = 4;
+
+    for (int i = 1; i <= 12; i++) {
+        int idx = i - 1;
+        int col = idx % cols;
+        int row = idx / cols;
+        int btnX = startX + col * (btnWidth + gapX);
+        int btnY = startY + row * (btnHeight + gapY);
+
+        // Highlight selected table
+        uint16_t btnColor;
+        if (selectedTable == i) {
+            btnColor = COLOR_GREEN;
+        } else {
+            // Use alternating colors for visual appeal
+            btnColor = buttonColors[idx % 4];
+        }
+
+        fillRoundedRect(btnX, btnY, btnWidth, btnHeight, 8, btnColor);
+
+        // Draw table number with "x" suffix
+        char tableText[8];
+        sprintf(tableText, "%d's", i);
+
+        tft.setTextSize(2);
+        tft.setTextColor(COLOR_BLACK);
+
+        // Center text in button
+        int textLen = strlen(tableText);
+        int textX = btnX + (btnWidth - textLen * 12) / 2;
+        int textY = btnY + (btnHeight - 14) / 2;
+        tft.setCursor(textX, textY);
+        tft.print(tableText);
+
+        // Draw selection indicator
+        if (selectedTable == i) {
+            tft.drawRoundRect(btnX - 2, btnY - 2, btnWidth + 4, btnHeight + 4, 10, COLOR_YELLOW);
+        }
+    }
+
+    // Footer hint
+    tft.setTextSize(1);
+    drawCenteredText("Tap a table to practice just that one!", 225, 1, COLOR_WHITE);
 }
 
 // ============================================================================
